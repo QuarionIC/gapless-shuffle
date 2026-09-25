@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F7F7F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#13161C" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-title" content="Gapless">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjogIkdhcGxlc3MgU2h1ZmZsZSIsICJzaG9ydF9uYW1lIjogIkdhcGxlc3MiLCAic3RhcnRfdXJsIjogIi4iLCAic2NvcGUiOiAiLiIsICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLCAiYmFja2dyb3VuZF9jb2xvciI6ICIjRjdGN0Y0IiwgInRoZW1lX2NvbG9yIjogIiMxRTZFNkEiLCAiaWNvbnMiOiBbeyJzcmMiOiAiZGF0YTppbWFnZS9zdmcreG1sO2Jhc2U2NCxQSE4yWnlCNGJXeHVjejBpYUhSMGNEb3ZMM2QzZHk1M015NXZjbWN2TWpBd01DOXpkbWNpSUhacFpYZENiM2c5SWpBZ01DQXhPREFnTVRnd0lqNDhjbVZqZENCM2FXUjBhRDBpTVRnd0lpQm9aV2xuYUhROUlqRTRNQ0lnY25nOUlqUXdJaUJtYVd4c1BTSWpNVVUyUlRaQklpOCtQSEJoZEdnZ1pEMGlUVFl3SURVeWRqYzJiRFl5TFRNNGVpSWdabWxzYkQwaUkyWm1aaUl2UGp3dmMzWm5QZz09IiwgInNpemVzIjogImFueSIsICJ0eXBlIjogImltYWdlL3N2Zyt4bWwifV19">
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjQwIiBmaWxsPSIjMUU2RTZBIi8+PHBhdGggZD0iTTYwIDUydjc2bDYyLTM4eiIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjQwIiBmaWxsPSIjMUU2RTZBIi8+PHBhdGggZD0iTTYwIDUydjc2bDYyLTM4eiIgZmlsbD0iI2ZmZiIvPjwvc3ZnPg==">
+<style>:root{padding-top:env(safe-area-inset-top,0px)} [hidden]{display:none!important}</style>
+<title>Gapless Shuffle</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F7F7F4; --surface:#FFFFFF; --ink:#1B2230; --muted:#66707F; --line:#DCDFE3;
+  --accent:#1E6E6A; --accent-ink:#FFFFFF; --accent-soft:#DDEDEB; --chip:#EEF0F1;
+  --hop:#1E6E6A; --hpi:#B0692B; --hap:#7A4C9E; --hpc:#A63D4B; --extra:#66707F;
+  --shadow:0 -6px 24px rgba(27,34,48,.10);
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"Newsreader",Georgia,"Times New Roman",serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#13161C; --surface:#1B1F27; --ink:#E7E9EC; --muted:#98A1AE; --line:#2C323C;
+    --accent:#4FB5AF; --accent-ink:#0E1A19; --accent-soft:#1E3735; --chip:#242A34;
+    --hop:#4FB5AF; --hpi:#D99552; --hap:#B08AD6; --hpc:#E0707D; --extra:#98A1AE;
+    --shadow:0 -6px 24px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#13161C; --surface:#1B1F27; --ink:#E7E9EC; --muted:#98A1AE; --line:#2C323C;
+  --accent:#4FB5AF; --accent-ink:#0E1A19; --accent-soft:#1E3735; --chip:#242A34;
+  --hop:#4FB5AF; --hpi:#D99552; --hap:#B08AD6; --hpc:#E0707D; --extra:#98A1AE;
+  --shadow:0 -6px 24px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.45;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:720px;margin:0 auto;padding:16px 16px 190px}
+header h1{font-family:var(--serif);font-weight:600;font-size:30px;line-height:1.1;margin:4px 0 2px;text-wrap:balance;letter-spacing:-.01em}
+header p{margin:0 0 14px;color:var(--muted);font-size:13.5px}
+.stats{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--mono);font-size:12.5px;color:var(--muted);margin-bottom:12px;font-variant-numeric:tabular-nums}
+.stats b{color:var(--ink);font-weight:500}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:10px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;padding:7px 12px;border-radius:999px;background:var(--chip);font-size:13px;font-weight:500;display:flex;gap:7px;align-items:center;border:1px solid transparent}
+.tab .dot{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.tab .n{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--surface);border-color:var(--line);box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.tools input[type=search]{flex:1 1 180px;min-width:0;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit}
+.btn{padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:13px;font-weight:500;white-space:nowrap}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.quiet{border-color:transparent;background:transparent;color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:default}
+.range{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted);margin-bottom:12px}
+.range input[type=number]{width:74px;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:13px}
+.group{margin:18px 0 8px;display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.group h2{font-family:var(--serif);font-weight:600;font-size:19px;margin:0}
+.group h2::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--c);margin-right:9px;vertical-align:baseline}
+.group small{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.list{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.row{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:9px 12px;border-top:1px solid var(--line);min-height:44px}
+.row:first-child{border-top:0}
+.row.playing{background:var(--accent-soft)}
+.row input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+.row .t{min-width:0;font-size:14px;line-height:1.3}
+.row .t .num{font-family:var(--mono);font-size:12px;color:var(--muted);margin-right:6px}
+.row .t .meta{display:block;font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px}
+.row .t .done{color:var(--accent);font-weight:500}
+.row .play{width:34px;height:34px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;color:var(--ink)}
+.row .play svg{width:14px;height:14px;fill:currentColor}
+.more{width:100%;padding:12px;text-align:center;color:var(--muted);font-size:13px;border-top:1px solid var(--line)}
+.empty{padding:22px 12px;text-align:center;color:var(--muted);font-size:13.5px}
+details.io{margin-top:22px;font-size:13.5px;color:var(--muted)}
+details.io summary{cursor:pointer;color:var(--ink);font-weight:500}
+details.io textarea{width:100%;height:96px;margin-top:8px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-family:var(--mono);font-size:12px;resize:vertical}
+details.io .rowb{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.toast{position:fixed;left:50%;bottom:calc(178px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+/* player */
+.player{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);box-shadow:var(--shadow);padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px))}
+.player .in{max-width:720px;margin:0 auto}
+.now{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start}
+.now .lbl{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.now .lbl .sdot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c,var(--muted));margin-right:6px;vertical-align:baseline}
+.now .title{font-family:var(--serif);font-size:17px;line-height:1.2;font-weight:600;margin:2px 0 0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-wrap:balance}
+.now .qpos{font-family:var(--mono);font-size:11.5px;color:var(--muted);white-space:nowrap;padding-top:2px;font-variant-numeric:tabular-nums}
+.seek{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;margin-top:8px;font-family:var(--mono);font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.seek input[type=range]{width:100%;margin:0;accent-color:var(--accent);height:24px}
+.ctl{display:grid;grid-template-columns:auto auto 1fr auto auto;gap:6px;align-items:center;margin-top:6px}
+.ctl .mid{display:flex;justify-content:center;gap:10px;align-items:center}
+.ic{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;color:var(--ink)}
+.ic svg{width:20px;height:20px;fill:currentColor}
+.ic.big{width:56px;height:56px;background:var(--accent);color:var(--accent-ink)}
+.ic.big svg{width:24px;height:24px}
+.ic.small{width:36px;height:36px;font-family:var(--mono);font-size:11px;font-weight:500;border:1px solid var(--line)}
+.rate{font-family:var(--mono);font-size:12px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink)}
+.ic:disabled{opacity:.35;cursor:default}
+@media (prefers-reduced-motion: reduce){.toast{transition:none}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Gapless Shuffle</h1>
+  <p>History of Philosophy without any gaps, shuffled. Tick the episodes you want in the pool; the player draws from them without repeating until the pool is exhausted.</p>
+</header>
+<div class="stats" id="stats"></div>
+<div class="tabs" role="tablist" id="tabs"></div>
+<div class="tools">
+  <input type="search" id="q" placeholder="Search titles…" autocomplete="off">
+  <button class="btn" id="selAll">Select shown</button>
+  <button class="btn" id="clrAll">Clear shown</button>
+</div>
+<div class="range" id="rangeRow">
+  <span>Select numbers</span>
+  <input type="number" id="rFrom" min="1" placeholder="from" inputmode="numeric">
+  <span>to</span>
+  <input type="number" id="rTo" min="1" placeholder="to" inputmode="numeric">
+  <button class="btn" id="rAdd">Add</button>
+  <button class="btn quiet" id="rRem">Remove</button>
+</div>
+<div id="lists"></div>
+<details class="io">
+  <summary>Import / export the pool</summary>
+  <p>Export copies the pool as one id per line (e.g. <code>HoP-42</code>, <code>HPI-7</code>, <code>HAP-101</code>, <code>HPC-3</code>). Import accepts the same ids, or a list of episode audio URLs, or the JSON exported from the Apple Podcasts backup script; matched episodes are added to the pool.</p>
+  <textarea id="ioText" placeholder="Paste ids, URLs, or JSON here"></textarea>
+  <div class="rowb">
+    <button class="btn" id="ioImport">Import into pool</button>
+    <button class="btn" id="ioExport">Copy pool</button>
+    <button class="btn quiet" id="ioResetCycle">Reset shuffle cycle</button>
+    <button class="btn quiet" id="ioResetPos">Forget positions</button>
+  </div>
+</details>
+</div>
+
+<div class="player">
+ <div class="in">
+  <div class="now">
+    <div>
+      <div class="lbl" id="nowLbl"><span class="sdot"></span>Nothing queued</div>
+      <p class="title" id="nowTitle">Tick some episodes, then press play.</p>
+    </div>
+    <div class="qpos" id="qpos"></div>
+  </div>
+  <div class="seek">
+    <span id="tCur">0:00</span>
+    <input type="range" id="seek" min="0" max="1000" value="0" step="1" aria-label="Seek">
+    <span id="tDur">0:00</span>
+  </div>
+  <div class="ctl">
+    <button class="ic small" id="back30" title="Back 30 s">−30</button>
+    <button class="ic" id="prev" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+    <div class="mid">
+      <button class="ic big" id="playBtn" title="Play"><svg id="playIco" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+    </div>
+    <button class="ic" id="next" title="Next"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z"/></svg></button>
+    <select class="rate" id="rate" aria-label="Playback speed">
+      <option value="0.8">0.8×</option><option value="1" selected>1.0×</option><option value="1.1">1.1×</option><option value="1.2">1.2×</option><option value="1.3">1.3×</option><option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2.0×</option>
+    </select>
+  </div>
+ </div>
+</div>
+<div class="toast" id="toast"></div>
+<audio id="audio" preload="metadata" playsinline></audio>
+
+<script>
+function main(rows){
+'use strict';
+const PFX = 'https://mcdn.podbean.com/mf/web/';
+const EP = rows.map(r => ({ s:r[0], n:r[1]||null, sfx:r[2], t:r[3], d:r[4], u:(/^https?:/.test(r[5])?r[5]:PFX+r[5]), dur:r[6],
+  id: r[1] ? `${r[0]}-${r[1]}${r[2]||''}` : 'X-'+r[4]+'-'+r[3].replace(/\W+/g,'').slice(0,20) }));
+window.__EP = EP;
+const byId = new Map(EP.map(e=>[e.id,e]));
+const byUrl = new Map(EP.map(e=>[e.u,e]));
+const SERIES = [
+  {k:'HoP', name:'Main series', long:'History of Philosophy', c:'var(--hop)'},
+  {k:'HPI', name:'India', long:'Philosophy in India', c:'var(--hpi)'},
+  {k:'HAP', name:'Africana', long:'Africana Philosophy', c:'var(--hap)'},
+  {k:'HPC', name:'China', long:'Philosophy in China', c:'var(--hpc)'},
+  {k:'Extra', name:'Extras', long:'Bonus episodes and announcements', c:'var(--extra)'},
+];
+const sColor = k => (SERIES.find(s=>s.k===k)||{}).c || 'var(--extra)';
+
+// ---------- persistence (per-browser convenience; everything degrades to defaults) ----------
+const LS = {
+  get(k, d){ try{ const v=localStorage.getItem('gs.'+k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
+  set(k, v){ try{ localStorage.setItem('gs.'+k, JSON.stringify(v)); }catch(e){} }
+};
+const state = {
+  pool: new Set(LS.get('pool', [])),          // selected episode ids
+  order: LS.get('order', []),                 // current shuffled permutation of pool ids
+  idx: LS.get('idx', -1),                     // index into order of the current episode
+  pos: LS.get('pos', {}),                     // id -> seconds
+  done: new Set(LS.get('done', [])),          // ids finished in this cycle
+  rate: LS.get('rate', 1),
+  tab: LS.get('tab', 'HoP'),
+  visibleCap: {},
+};
+// drop ids that no longer exist (feed changes)
+for (const id of [...state.pool]) if (!byId.has(id)) state.pool.delete(id);
+state.order = state.order.filter(id => byId.has(id) && state.pool.has(id));
+if (state.idx >= state.order.length) state.idx = state.order.length - 1;
+const save = () => { LS.set('pool',[...state.pool]); LS.set('order',state.order); LS.set('idx',state.idx); LS.set('pos',state.pos); LS.set('done',[...state.done]); LS.set('rate',state.rate); LS.set('tab',state.tab); };
+
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const fmt = s => { s=Math.max(0,Math.floor(s||0)); const h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60; return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0'); };
+const hours = secs => (secs/3600).toFixed(1)+' h';
+const label = e => e.n ? `${e.s} ${e.n}${e.sfx||''}` : 'Extra';
+function shuffle(a){ // Fisher–Yates with crypto randomness
+  const r = new Uint32Array(a.length);
+  (window.crypto||{}).getRandomValues ? crypto.getRandomValues(r) : r.forEach((_,i)=>r[i]=Math.random()*2**32);
+  for (let i=a.length-1;i>0;i--){ const j = r[i] % (i+1); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+let toastT; function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200); }
+
+// ---------- queue logic ----------
+// The order is a permutation of the pool. When the pool changes, keep the already-played prefix
+// (order[0..idx]) as-is, drop removed ids, and append the newly added ids shuffled into the remainder.
+function rebuildOrder(){
+  const played = state.order.slice(0, state.idx+1).filter(id => state.pool.has(id) || id === loadedId);
+  const playedSet = new Set(played);
+  const rest = shuffle([...state.pool].filter(id => !playedSet.has(id)));
+  state.order = played.concat(rest);
+  state.idx = played.length - 1;
+}
+function newCycle(){
+  state.done.clear();
+  state.order = shuffle([...state.pool]);
+  state.idx = -1;
+}
+function current(){ return state.idx>=0 && state.idx<state.order.length ? byId.get(state.order[state.idx]) : null; }
+function advance(dir){
+  if (!state.pool.size){ toast('The pool is empty. Tick some episodes first.'); return null; }
+  if (dir>0){
+    if (state.idx+1 >= state.order.length){
+      // cycle exhausted: reshuffle, but don't let the first pick equal the last played
+      const last = state.order[state.order.length-1];
+      newCycle();
+      if (state.order.length>1 && state.order[0]===last){ const j=1+Math.floor(Math.random()*(state.order.length-1)); [state.order[0],state.order[j]]=[state.order[j],state.order[0]]; }
+      toast('Pool exhausted; starting a fresh shuffle.');
+    }
+    state.idx++;
+  } else {
+    if (state.idx<=0) return current();
+    state.idx--;
+  }
+  return current();
+}
+
+// ---------- audio ----------
+const audio = $('audio');
+audio.playbackRate = state.rate; $('rate').value = String(state.rate);
+audio.addEventListener('loadedmetadata', ()=>{ audio.playbackRate = state.rate; });
+let loadedId = null;
+let errStreak = 0;
+function load(e, autoplay){
+  if (!e) return;
+  if (loadedId !== e.id){
+    audio.src = e.u; loadedId = e.id;
+    const p = state.pos[e.id]||0;
+    if (p>5 && p < (e.dur||1e9)-20) audio.addEventListener('loadedmetadata', function h(){ audio.currentTime=p; audio.removeEventListener('loadedmetadata',h); });
+  }
+  renderNow(); renderRows();
+  setMediaSession(e);
+  if (autoplay){ const pr = audio.play(); if (pr && pr.catch) pr.catch(err=>{ console.warn(err); if (err && err.name==='NotAllowedError') toast('Tap play to start (iOS needs a tap first).'); }); }
+}
+function playPause(){
+  let e = current();
+  if (!e){ e = advance(1); if (!e) return; save(); load(e, true); return; }
+  if (audio.paused){ if (audio.error) { loadedId = null; errStreak = 0; } if (loadedId!==e.id) load(e,true); else audio.play().catch(()=>{}); } else audio.pause();
+}
+function playId(id){
+  // jump to a specific episode: move it to the next slot in the order (keeps the no-repeat guarantee)
+  if (!state.pool.has(id)){ state.pool.add(id); rebuildOrder(); }
+  const k = state.order.indexOf(id);
+  if (k > state.idx){ state.order.splice(k,1); state.order.splice(state.idx+1,0,id); state.idx++; }
+  else if (k >= 0){ state.idx = k; }
+  save(); load(byId.get(id), true);
+}
+audio.addEventListener('timeupdate', () => {
+  const e=current(); if (!e || loadedId!==e.id) return;
+  if (Math.floor(audio.currentTime)%5===0){ state.pos[e.id]=audio.currentTime; LS.set('pos',state.pos); }
+  if (!seeking){ $('seek').value = audio.duration ? Math.round(1000*audio.currentTime/audio.duration) : 0; }
+  $('tCur').textContent = fmt(audio.currentTime); $('tDur').textContent = fmt(audio.duration||e.dur);
+  if ('mediaSession' in navigator && navigator.mediaSession.setPositionState && audio.duration && isFinite(audio.duration)) { try{ navigator.mediaSession.setPositionState({duration:audio.duration, playbackRate:audio.playbackRate, position:Math.min(audio.currentTime,audio.duration)}); }catch(err){} }
+});
+audio.addEventListener('ended', () => {
+  const e=current(); if (e){ state.done.add(e.id); delete state.pos[e.id]; }
+  const n = advance(1); save(); load(n, true);
+});
+audio.addEventListener('playing', ()=>{ errStreak = 0; });
+audio.addEventListener('error', () => {
+  const e=current(); if (!e) return;
+  errStreak++;
+  if (errStreak > 1){ toast('Two episodes failed to load in a row; check the connection, then press play.'); return; }
+  toast('Could not load "'+e.t+'"; trying the next one.'); const n=advance(1); save(); load(n,true);
+});
+audio.addEventListener('play', renderPlayIcon); audio.addEventListener('pause', renderPlayIcon); audio.addEventListener('error', renderPlayIcon); audio.addEventListener('emptied', renderPlayIcon);
+let seeking=false;
+$('seek').addEventListener('input', ()=>{ seeking=true; if (audio.duration) $('tCur').textContent=fmt(audio.duration*$('seek').value/1000); });
+$('seek').addEventListener('change', ()=>{ if (audio.duration) audio.currentTime = audio.duration*$('seek').value/1000; seeking=false; });
+$('playBtn').onclick = playPause;
+$('next').onclick = ()=>{ const e=current(); if (e && audio.currentTime>30) state.pos[e.id]=audio.currentTime; const n=advance(1); if (n){ save(); load(n,true);} };
+$('prev').onclick = ()=>{ if (audio.currentTime>8){ audio.currentTime=0; return; } const n=advance(-1); if (n){ save(); load(n,true);} };
+$('back30').onclick = ()=>{ audio.currentTime=Math.max(0,audio.currentTime-30); };
+$('rate').onchange = ()=>{ state.rate=parseFloat($('rate').value); audio.playbackRate=state.rate; save(); };
+function setMediaSession(e){
+  if (!('mediaSession' in navigator)) return;
+  const ms = navigator.mediaSession;
+  try { ms.metadata = new MediaMetadata({ title: (e.n?label(e)+' · ':'')+e.t, artist:'Peter Adamson', album:'History of Philosophy without any gaps' }); } catch(err){}
+  const H = (k,f)=>{ try{ ms.setActionHandler(k,f);}catch(err){} };
+  H('play', ()=>audio.play()); H('pause', ()=>audio.pause());
+  H('nexttrack', ()=>$('next').onclick()); H('previoustrack', ()=>$('prev').onclick());
+  H('seekbackward', d=>{ audio.currentTime=Math.max(0,audio.currentTime-(d.seekOffset||30)); });
+  H('seekforward', d=>{ audio.currentTime=Math.min(audio.duration||1e9,audio.currentTime+(d.seekOffset||30)); });
+  H('seekto', d=>{ if (d.seekTime!=null) audio.currentTime=d.seekTime; });
+}
+
+// ---------- rendering ----------
+function renderPlayIcon(){ $('playIco').innerHTML = audio.paused ? '<path d="M8 5v14l11-7z"/>' : '<path d="M6 5h4v14H6zm8 0h4v14h-4z"/>'; $('playBtn').title = audio.paused?'Play':'Pause'; }
+function renderNow(){
+  const e=current();
+  if (!e){ $('nowLbl').innerHTML='<span class="sdot"></span>Nothing queued'; $('nowTitle').textContent = state.pool.size? 'Press play to draw the first episode.':'Tick some episodes, then press play.'; $('qpos').textContent=''; return; }
+  $('nowLbl').innerHTML = `<span class="sdot" style="--c:${sColor(e.s)}"></span>${label(e)} · ${e.d}`;
+  $('nowTitle').textContent = e.t;
+  $('qpos').textContent = `${state.idx+1} / ${state.order.length}`;
+  $('tDur').textContent = fmt(audio.duration||e.dur);
+}
+function renderStats(){
+  let secs=0; for (const id of state.pool) secs += byId.get(id).dur||0;
+  const remaining = state.order.length - (state.idx+1);
+  $('stats').innerHTML = `<span><b>${state.pool.size}</b> in pool</span><span><b>${hours(secs)}</b> of audio</span><span><b>${remaining}</b> left this cycle</span><span>${EP.length} episodes in the feeds</span>`;
+}
+function renderTabs(){
+  $('tabs').innerHTML = SERIES.map(s=>{ const all=EP.filter(e=>e.s===s.k).length, sel=EP.filter(e=>e.s===s.k && state.pool.has(e.id)).length;
+    return `<button class="tab" role="tab" data-k="${s.k}" aria-selected="${state.tab===s.k}" style="--c:${s.c}"><span class="dot"></span>${s.name}<span class="n">${sel}/${all}</span></button>`; }).join('');
+  $('tabs').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{ state.tab=b.dataset.k; save(); render(); });
+  $('rangeRow').hidden = state.tab==='Extra';
+}
+function visible(){
+  const q = $('q').value.trim().toLowerCase();
+  return EP.filter(e => e.s===state.tab && (!q || (label(e)+' '+e.t).toLowerCase().includes(q)));
+}
+const PAGE = 120;
+function renderRows(){
+  const items = visible(); const s = SERIES.find(x=>x.k===state.tab);
+  const cap = state.visibleCap[state.tab] || PAGE;
+  const cur = current();
+  const rows = items.slice(0,cap).map(e=>{
+    const done = state.done.has(e.id), p = state.pos[e.id];
+    const meta = [e.d, fmt(e.dur)].concat(done?['<span class="done">played this cycle</span>']:[], (p&&p>30)?['at '+fmt(p)]:[]).join(' · ');
+    return `<li class="row${cur&&cur.id===e.id?' playing':''}" data-id="${e.id}">
+      <input type="checkbox" id="cb-${e.id}" ${state.pool.has(e.id)?'checked':''} aria-label="Include ${label(e)} ${e.t}">
+      <label class="t" for="cb-${e.id}">${e.n?`<span class="num">${e.n}${e.sfx||''}</span>`:''}${e.t}<span class="meta">${meta}</span></label>
+      <button class="play" data-play="${e.id}" title="Play now"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button></li>`; }).join('');
+  $('lists').innerHTML = `<div class="group" style="--c:${s.c}"><h2>${s.long}</h2><small>${items.length} shown</small></div>
+    <ul class="list">${rows || '<li class="empty">No episodes match.</li>'}${items.length>cap?`<li><button class="more" id="more">Show ${Math.min(PAGE, items.length-cap)} more of ${items.length-cap}</button></li>`:''}</ul>`;
+  $('lists').querySelectorAll('input[type=checkbox]').forEach(cb=>cb.onchange=()=>{ const id=cb.closest('.row').dataset.id; cb.checked?state.pool.add(id):state.pool.delete(id); poolChanged(); });
+  $('lists').querySelectorAll('[data-play]').forEach(b=>b.onclick=()=>playId(b.dataset.play));
+  const m=$('more'); if (m) m.onclick=()=>{ state.visibleCap[state.tab]=cap+PAGE; renderRows(); };
+}
+function poolChanged(){ rebuildOrder(); save(); renderStats(); renderTabs(); renderNow(); renderRows(); }
+function render(){ renderStats(); renderTabs(); renderNow(); renderRows(); renderPlayIcon(); }
+
+// ---------- bulk tools ----------
+$('q').addEventListener('input', ()=>{ state.visibleCap={}; renderRows(); });
+$('selAll').onclick = ()=>{ visible().forEach(e=>state.pool.add(e.id)); poolChanged(); toast('Added the shown episodes.'); };
+$('clrAll').onclick = ()=>{ visible().forEach(e=>state.pool.delete(e.id)); poolChanged(); toast('Removed the shown episodes.'); };
+function rangeIds(){ const a=parseInt($('rFrom').value,10), b=parseInt($('rTo').value,10); if (isNaN(a)||isNaN(b)) { toast('Enter both numbers.'); return []; } const lo=Math.min(a,b), hi=Math.max(a,b); return EP.filter(e=>e.s===state.tab && e.n!=null && e.n>=lo && e.n<=hi).map(e=>e.id); }
+$('rAdd').onclick = ()=>{ const ids=rangeIds(); ids.forEach(id=>state.pool.add(id)); if (ids.length){ poolChanged(); toast(`Added ${ids.length} episodes.`);} };
+$('rRem').onclick = ()=>{ const ids=rangeIds(); ids.forEach(id=>state.pool.delete(id)); if (ids.length){ poolChanged(); toast(`Removed ${ids.length} episodes.`);} };
+
+// ---------- import / export ----------
+function parseImport(text){
+  const found = new Set(); let unmatched = 0;
+  const tryAdd = tok => { tok=String(tok).trim(); if (!tok) return; const e = byId.get(tok) || byUrl.get(tok) || byId.get(tok.replace(/\s+/,'-')) ; if (e) found.add(e.id); else unmatched++; };
+  let parsed=null; try{ parsed=JSON.parse(text);}catch(e){}
+  if (parsed){
+    const arr = Array.isArray(parsed) ? parsed : (parsed.episodes||parsed.played||[]);
+    for (const it of arr){
+      if (typeof it==='string'){ tryAdd(it); continue; }
+      if (it && typeof it==='object'){
+        const e = (it.id&&byId.get(it.id)) || (it.url&&byUrl.get(it.url)) || (it.enclosure&&byUrl.get(it.enclosure)) || matchTitle(it.title);
+        if (e) found.add(e.id); else unmatched++;
+      }
+    }
+  } else text.split(/[\n,;]+/).forEach(tryAdd);
+  return {found, unmatched};
+}
+const normT = s => String(s||'').toLowerCase().replace(/[’'"“”]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+const titleIndex = new Map(EP.map(e=>[normT((e.n?e.s+' '+String(e.n).padStart(2,'0')+(e.sfx||'')+' ':'')+e.t), e]).concat(EP.map(e=>[normT(e.t), e])));
+function matchTitle(t){ if (!t) return null; const n=normT(t); if (titleIndex.has(n)) return titleIndex.get(n); const m = n.match(/^(hop|hpi|hap|hpc)\s*0*(\d+)([ab])?\b/); if (m){ return byId.get(m[1].toUpperCase().replace('HOP','HoP')+'-'+m[2]+(m[3]||'')) || null; } return null; }
+$('ioImport').onclick = ()=>{ const {found,unmatched}=parseImport($('ioText').value); found.forEach(id=>state.pool.add(id)); poolChanged(); toast(`Added ${found.size} episodes${unmatched?`; ${unmatched} entries didn't match`:''}.`); };
+$('ioExport').onclick = async ()=>{ const txt=[...state.pool].join('\n'); $('ioText').value=txt; try{ await navigator.clipboard.writeText(txt); toast('Copied the pool.'); }catch(e){ $('ioText').select(); toast('Select and copy the text above.'); } };
+$('ioResetCycle').onclick = ()=>{ newCycle(); save(); render(); toast('New shuffle cycle.'); };
+$('ioResetPos').onclick = ()=>{ state.pos={}; save(); renderRows(); toast('Forgot saved positions.'); };
+
+// ---------- boot ----------
+render();
+const c = current(); if (c) load(c, false);
+}
+fetch('episodes.json', {cache:'no-cache'}).then(r => { if (!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  .then(rows => main(rows))
+  .catch(err => { const el=document.getElementById('lists'); el.innerHTML = '<div class="empty">Could not load the episode list ('+err.message+'). Check the connection and reload.</div>'; console.error(err); });
+</script>
+
+</body>
+</html>
