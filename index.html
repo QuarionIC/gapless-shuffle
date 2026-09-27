@@ -134,6 +134,7 @@ details.io .rowb{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 <div id="lists"></div>
 <details class="io">
   <summary>Import / export the pool</summary>
+  <p>Lock-screen, car and headphone skip buttons go back 15 s and forward 30 s (episodes still change on their own when one ends). After an outside interruption such as a call, Siri, or Maps directions with “Pause Spoken Audio” on, playback resumes 2 s before the interruption.</p>
   <p>Export copies the pool as one id per line (e.g. <code>HoP-42</code>, <code>HPI-7</code>, <code>HAP-101</code>, <code>HPC-3</code>). Import accepts the same ids, or a list of episode audio URLs, or the JSON exported from the Apple Podcasts backup script; matched episodes are added to the pool.</p>
   <textarea id="ioText" placeholder="Paste ids, URLs, or JSON here"></textarea>
   <div class="rowb">
@@ -267,9 +268,34 @@ audio.playbackRate = state.rate; $('rate').value = String(state.rate);
 audio.addEventListener('loadedmetadata', ()=>{ audio.playbackRate = state.rate; });
 let loadedId = null;
 let errStreak = 0;
+// ---------- interruptions ----------
+// iOS pauses the element for calls, Siri, and Maps prompts (with "Pause Spoken Audio" on).
+// Those arrive as a plain 'pause' event the page did not ask for. Pauses the page itself
+// requests (button, lock screen, source change) are flagged first, so only external ones
+// record a resume point; the next 'play' then backs up REWIND_S seconds.
+const REWIND_S = 2;
+const SKIP_BACK_S = 15, SKIP_FWD_S = 30;   // system prev/next (car, lock screen, headphones)
+let uiPause = false, uiPauseTimer = null, interruptedAt = null;
+function markUiPause(){ uiPause = true; clearTimeout(uiPauseTimer); uiPauseTimer = setTimeout(()=>{ uiPause = false; }, 800); }
+function pauseByUI(){ markUiPause(); audio.pause(); }
+function skipBy(sec){ const d = isFinite(audio.duration) ? audio.duration : 1e9; audio.currentTime = Math.min(Math.max(0, audio.currentTime + sec), Math.max(0, d - 0.5)); }
+audio.addEventListener('pause', () => {
+  if (uiPause){ uiPause = false; clearTimeout(uiPauseTimer); return; }
+  const e = current();
+  if (!e || loadedId !== e.id || audio.ended || !isFinite(audio.currentTime)) return;
+  if (isFinite(audio.duration) && audio.duration - audio.currentTime < 1) return;
+  interruptedAt = audio.currentTime;
+  state.pos[e.id] = audio.currentTime; LS.set('pos', state.pos);
+});
+audio.addEventListener('play', () => {
+  if (interruptedAt == null) return;
+  const at = interruptedAt; interruptedAt = null;
+  if (Math.abs(audio.currentTime - at) < 1.5) audio.currentTime = Math.max(0, at - REWIND_S);
+});
 function load(e, autoplay){
   if (!e) return;
   if (loadedId !== e.id){
+    interruptedAt = null; if (!audio.paused) markUiPause();
     audio.src = e.u; loadedId = e.id;
     const p = state.pos[e.id]||0;
     if (p>5 && p < (e.dur||1e9)-20) audio.addEventListener('loadedmetadata', function h(){ audio.currentTime=p; audio.removeEventListener('loadedmetadata',h); });
@@ -281,7 +307,7 @@ function load(e, autoplay){
 function playPause(){
   let e = current();
   if (!e){ e = advance(1); if (!e) return; save(); load(e, true); return; }
-  if (audio.paused){ if (audio.error) { loadedId = null; errStreak = 0; } if (loadedId!==e.id) load(e,true); else audio.play().catch(()=>{}); } else audio.pause();
+  if (audio.paused){ if (audio.error) { loadedId = null; errStreak = 0; } if (loadedId!==e.id) load(e,true); else audio.play().catch(()=>{}); } else pauseByUI();
 }
 function playId(id){
   // jump to a specific episode: move it to the next slot in the order (keeps the no-repeat guarantee)
@@ -323,10 +349,10 @@ function setMediaSession(e){
   const ms = navigator.mediaSession;
   try { ms.metadata = new MediaMetadata({ title: (e.n?label(e)+' · ':'')+e.t, artist:'Peter Adamson', album:'History of Philosophy without any gaps' }); } catch(err){}
   const H = (k,f)=>{ try{ ms.setActionHandler(k,f);}catch(err){} };
-  H('play', ()=>audio.play()); H('pause', ()=>audio.pause());
-  H('nexttrack', ()=>$('next').onclick()); H('previoustrack', ()=>$('prev').onclick());
-  H('seekbackward', d=>{ audio.currentTime=Math.max(0,audio.currentTime-(d.seekOffset||30)); });
-  H('seekforward', d=>{ audio.currentTime=Math.min(audio.duration||1e9,audio.currentTime+(d.seekOffset||30)); });
+  H('play', ()=>audio.play().catch(()=>{})); H('pause', ()=>pauseByUI());
+  H('nexttrack', ()=>skipBy(SKIP_FWD_S)); H('previoustrack', ()=>skipBy(-SKIP_BACK_S));
+  H('seekbackward', d=>skipBy(-((d && d.seekOffset) || SKIP_BACK_S)));
+  H('seekforward', d=>skipBy((d && d.seekOffset) || SKIP_FWD_S));
   H('seekto', d=>{ if (d.seekTime!=null) audio.currentTime=d.seekTime; });
 }
 
