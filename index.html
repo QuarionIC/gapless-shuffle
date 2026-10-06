@@ -114,7 +114,7 @@ details.io .rowb{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 <div class="wrap">
 <header>
   <h1>Gapless Shuffle</h1>
-  <p>History of Philosophy without any gaps, shuffled. Tick the episodes you want in the pool; the player draws from them without repeating until the pool is exhausted.</p>
+  <p>History of Philosophy without any gaps, shuffled. Tick the episodes you want in the pool; each next episode is an independent uniform draw from the pool, with replacement, so repeats can happen.</p>
 </header>
 <div class="stats" id="stats"></div>
 <div class="tabs" role="tablist" id="tabs"></div>
@@ -140,7 +140,7 @@ details.io .rowb{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
   <div class="rowb">
     <button class="btn" id="ioImport">Import into pool</button>
     <button class="btn" id="ioExport">Copy pool</button>
-    <button class="btn quiet" id="ioResetCycle">Reset shuffle cycle</button>
+    <button class="btn quiet" id="ioResetCycle">Clear history</button>
     <button class="btn quiet" id="ioResetPos">Forget positions</button>
   </div>
 </details>
@@ -201,17 +201,17 @@ const LS = {
 };
 const state = {
   pool: new Set(LS.get('pool', [])),          // selected episode ids
-  order: LS.get('order', []),                 // current shuffled permutation of pool ids
-  idx: LS.get('idx', -1),                     // index into order of the current episode
+  order: LS.get('order', []),                 // play history (ids), oldest first
+  idx: LS.get('idx', -1),                     // index into the history of the current episode
   pos: LS.get('pos', {}),                     // id -> seconds
-  done: new Set(LS.get('done', [])),          // ids finished in this cycle
+  done: new Set(LS.get('done', [])),          // ids that have been played to the end at least once
   rate: LS.get('rate', 1),
   tab: LS.get('tab', 'HoP'),
   visibleCap: {},
 };
 // drop ids that no longer exist (feed changes)
 for (const id of [...state.pool]) if (!byId.has(id)) state.pool.delete(id);
-state.order = state.order.filter(id => byId.has(id) && state.pool.has(id));
+state.order = state.order.filter(id => byId.has(id));
 if (state.idx >= state.order.length) state.idx = state.order.length - 1;
 const save = () => { LS.set('pool',[...state.pool]); LS.set('order',state.order); LS.set('idx',state.idx); LS.set('pos',state.pos); LS.set('done',[...state.done]); LS.set('rate',state.rate); LS.set('tab',state.tab); };
 
@@ -220,39 +220,38 @@ const $ = id => document.getElementById(id);
 const fmt = s => { s=Math.max(0,Math.floor(s||0)); const h=Math.floor(s/3600), m=Math.floor(s%3600/60), x=s%60; return (h?h+':'+String(m).padStart(2,'0'):m)+':'+String(x).padStart(2,'0'); };
 const hours = secs => (secs/3600).toFixed(1)+' h';
 const label = e => e.n ? `${e.s} ${e.n}${e.sfx||''}` : 'Extra';
-function shuffle(a){ // Fisher–Yates with crypto randomness
-  const r = new Uint32Array(a.length);
-  (window.crypto||{}).getRandomValues ? crypto.getRandomValues(r) : r.forEach((_,i)=>r[i]=Math.random()*2**32);
-  for (let i=a.length-1;i>0;i--){ const j = r[i] % (i+1); [a[i],a[j]]=[a[j],a[i]]; }
-  return a;
+// Uniform integer in [0, n) from the CSPRNG, with rejection sampling so there is no modulo bias.
+function randInt(n){
+  if (n <= 1) return 0;
+  const buf = new Uint32Array(1); const limit = Math.floor(2**32 / n) * n;
+  if ((window.crypto||{}).getRandomValues){ do { crypto.getRandomValues(buf); } while (buf[0] >= limit); return buf[0] % n; }
+  return Math.floor(Math.random() * n);
 }
+window.__randInt = randInt;
 let toastT; function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200); }
 
-// ---------- queue logic ----------
-// The order is a permutation of the pool. When the pool changes, keep the already-played prefix
-// (order[0..idx]) as-is, drop removed ids, and append the newly added ids shuffled into the remainder.
+// ---------- selection ----------
+// Every "next" at the end of the history is an independent uniform draw from the pool, WITH
+// replacement: each selected episode has probability 1/|pool| regardless of what played before,
+// so immediate repeats are possible and expected at rate 1/|pool|. The history (state.order)
+// records what was drawn so Previous/Next can walk back and forth through it.
+const HISTORY_MAX = 500;
+function drawFromPool(){ const ids = [...state.pool]; const r = (typeof window.__testRandInt === 'function') ? window.__testRandInt : randInt; return ids[r(ids.length)]; }
+window.__drawFromPool = drawFromPool;
 function rebuildOrder(){
-  const played = state.order.slice(0, state.idx+1).filter(id => state.pool.has(id) || id === loadedId);
-  const playedSet = new Set(played);
-  const rest = shuffle([...state.pool].filter(id => !playedSet.has(id)));
-  state.order = played.concat(rest);
-  state.idx = played.length - 1;
+  // pool edits never rewrite history; only the future draws change
+  if (state.order.length > HISTORY_MAX){ const cut = state.order.length - HISTORY_MAX; state.order = state.order.slice(cut); state.idx = Math.max(-1, state.idx - cut); }
 }
-function newCycle(){
-  state.done.clear();
-  state.order = shuffle([...state.pool]);
-  state.idx = -1;
+function clearHistory(){
+  const cur = state.idx>=0 ? state.order[state.idx] : null;
+  state.order = cur ? [cur] : []; state.idx = cur ? 0 : -1;
 }
 function current(){ return state.idx>=0 && state.idx<state.order.length ? byId.get(state.order[state.idx]) : null; }
 function advance(dir){
-  if (!state.pool.size){ toast('The pool is empty. Tick some episodes first.'); return null; }
   if (dir>0){
     if (state.idx+1 >= state.order.length){
-      // cycle exhausted: reshuffle, but don't let the first pick equal the last played
-      const last = state.order[state.order.length-1];
-      newCycle();
-      if (state.order.length>1 && state.order[0]===last){ const j=1+Math.floor(Math.random()*(state.order.length-1)); [state.order[0],state.order[j]]=[state.order[j],state.order[0]]; }
-      toast('Pool exhausted; starting a fresh shuffle.');
+      if (!state.pool.size){ toast('The pool is empty. Tick some episodes first.'); return null; }
+      state.order = state.order.slice(0, state.idx+1); state.order.push(drawFromPool()); rebuildOrder();
     }
     state.idx++;
   } else {
@@ -292,8 +291,11 @@ audio.addEventListener('play', () => {
   const at = interruptedAt; interruptedAt = null;
   if (Math.abs(audio.currentTime - at) < 1.5) audio.currentTime = Math.max(0, at - REWIND_S);
 });
-function load(e, autoplay){
+function load(e, autoplay, fresh){
   if (!e) return;
+  if (fresh && loadedId === e.id){ // the same episode was drawn again: start it over
+    interruptedAt = null; delete state.pos[e.id]; LS.set('pos', state.pos); audio.currentTime = 0;
+  }
   if (loadedId !== e.id){
     interruptedAt = null; if (!audio.paused) markUiPause();
     audio.src = e.u; loadedId = e.id;
@@ -306,15 +308,13 @@ function load(e, autoplay){
 }
 function playPause(){
   let e = current();
-  if (!e){ e = advance(1); if (!e) return; save(); load(e, true); return; }
+  if (!e){ e = advance(1); if (!e) return; save(); load(e, true, true); return; }
   if (audio.paused){ if (audio.error) { loadedId = null; errStreak = 0; } if (loadedId!==e.id) load(e,true); else audio.play().catch(()=>{}); } else pauseByUI();
 }
 function playId(id){
-  // jump to a specific episode: move it to the next slot in the order (keeps the no-repeat guarantee)
-  if (!state.pool.has(id)){ state.pool.add(id); rebuildOrder(); }
-  const k = state.order.indexOf(id);
-  if (k > state.idx){ state.order.splice(k,1); state.order.splice(state.idx+1,0,id); state.idx++; }
-  else if (k >= 0){ state.idx = k; }
+  // jump to a specific episode: it becomes the next entry in the history (forward history is dropped)
+  if (!state.pool.has(id)) state.pool.add(id);
+  state.order = state.order.slice(0, state.idx+1); state.order.push(id); state.idx = state.order.length-1; rebuildOrder();
   save(); load(byId.get(id), true);
 }
 audio.addEventListener('timeupdate', () => {
@@ -326,21 +326,21 @@ audio.addEventListener('timeupdate', () => {
 });
 audio.addEventListener('ended', () => {
   const e=current(); if (e){ state.done.add(e.id); delete state.pos[e.id]; }
-  const n = advance(1); save(); load(n, true);
+  const n = advance(1); save(); load(n, true, true);
 });
 audio.addEventListener('playing', ()=>{ errStreak = 0; });
 audio.addEventListener('error', () => {
   const e=current(); if (!e) return;
   errStreak++;
   if (errStreak > 1){ toast('Two episodes failed to load in a row; check the connection, then press play.'); return; }
-  toast('Could not load "'+e.t+'"; trying the next one.'); const n=advance(1); save(); load(n,true);
+  toast('Could not load "'+e.t+'"; trying the next one.'); const n=advance(1); save(); load(n,true,true);
 });
 audio.addEventListener('play', renderPlayIcon); audio.addEventListener('pause', renderPlayIcon); audio.addEventListener('error', renderPlayIcon); audio.addEventListener('emptied', renderPlayIcon);
 let seeking=false;
 $('seek').addEventListener('input', ()=>{ seeking=true; if (audio.duration) $('tCur').textContent=fmt(audio.duration*$('seek').value/1000); });
 $('seek').addEventListener('change', ()=>{ if (audio.duration) audio.currentTime = audio.duration*$('seek').value/1000; seeking=false; });
 $('playBtn').onclick = playPause;
-$('next').onclick = ()=>{ const e=current(); if (e && audio.currentTime>30) state.pos[e.id]=audio.currentTime; const n=advance(1); if (n){ save(); load(n,true);} };
+$('next').onclick = ()=>{ const e=current(); if (e && audio.currentTime>30) state.pos[e.id]=audio.currentTime; const n=advance(1); if (n){ save(); load(n,true,true);} };
 $('prev').onclick = ()=>{ if (audio.currentTime>8){ audio.currentTime=0; return; } const n=advance(-1); if (n){ save(); load(n,true);} };
 $('back30').onclick = ()=>{ audio.currentTime=Math.max(0,audio.currentTime-30); };
 $('rate').onchange = ()=>{ state.rate=parseFloat($('rate').value); audio.playbackRate=state.rate; save(); };
@@ -363,13 +363,13 @@ function renderNow(){
   if (!e){ $('nowLbl').innerHTML='<span class="sdot"></span>Nothing queued'; $('nowTitle').textContent = state.pool.size? 'Press play to draw the first episode.':'Tick some episodes, then press play.'; $('qpos').textContent=''; return; }
   $('nowLbl').innerHTML = `<span class="sdot" style="--c:${sColor(e.s)}"></span>${label(e)} · ${e.d}`;
   $('nowTitle').textContent = e.t;
-  $('qpos').textContent = `${state.idx+1} / ${state.order.length}`;
+  $('qpos').textContent = state.idx < state.order.length-1 ? `${state.idx+1} / ${state.order.length} in history` : `draw ${state.idx+1}`;
   $('tDur').textContent = fmt(audio.duration||e.dur);
 }
 function renderStats(){
   let secs=0; for (const id of state.pool) secs += byId.get(id).dur||0;
-  const remaining = state.order.length - (state.idx+1);
-  $('stats').innerHTML = `<span><b>${state.pool.size}</b> in pool</span><span><b>${hours(secs)}</b> of audio</span><span><b>${remaining}</b> left this cycle</span><span>${EP.length} episodes in the feeds</span>`;
+  const p = state.pool.size ? (100/state.pool.size) : 0;
+  $('stats').innerHTML = `<span><b>${state.pool.size}</b> in pool</span><span><b>${hours(secs)}</b> of audio</span><span><b>${p ? (p>=10 ? p.toFixed(0) : p.toFixed(1)) : '–'}%</b> each per draw</span><span><b>${state.order.length}</b> draws so far</span>`;
 }
 function renderTabs(){
   $('tabs').innerHTML = SERIES.map(s=>{ const all=EP.filter(e=>e.s===s.k).length, sel=EP.filter(e=>e.s===s.k && state.pool.has(e.id)).length;
@@ -388,7 +388,7 @@ function renderRows(){
   const cur = current();
   const rows = items.slice(0,cap).map(e=>{
     const done = state.done.has(e.id), p = state.pos[e.id];
-    const meta = [e.d, fmt(e.dur)].concat(done?['<span class="done">played this cycle</span>']:[], (p&&p>30)?['at '+fmt(p)]:[]).join(' · ');
+    const meta = [e.d, fmt(e.dur)].concat(done?['<span class="done">finished before</span>']:[], (p&&p>30)?['at '+fmt(p)]:[]).join(' · ');
     return `<li class="row${cur&&cur.id===e.id?' playing':''}" data-id="${e.id}">
       <input type="checkbox" id="cb-${e.id}" ${state.pool.has(e.id)?'checked':''} aria-label="Include ${label(e)} ${e.t}">
       <label class="t" for="cb-${e.id}">${e.n?`<span class="num">${e.n}${e.sfx||''}</span>`:''}${e.t}<span class="meta">${meta}</span></label>
@@ -432,7 +432,7 @@ const titleIndex = new Map(EP.map(e=>[normT((e.n?e.s+' '+String(e.n).padStart(2,
 function matchTitle(t){ if (!t) return null; const n=normT(t); if (titleIndex.has(n)) return titleIndex.get(n); const m = n.match(/^(hop|hpi|hap|hpc)\s*0*(\d+)([ab])?\b/); if (m){ return byId.get(m[1].toUpperCase().replace('HOP','HoP')+'-'+m[2]+(m[3]||'')) || null; } return null; }
 $('ioImport').onclick = ()=>{ const {found,unmatched}=parseImport($('ioText').value); found.forEach(id=>state.pool.add(id)); poolChanged(); toast(`Added ${found.size} episodes${unmatched?`; ${unmatched} entries didn't match`:''}.`); };
 $('ioExport').onclick = async ()=>{ const txt=[...state.pool].join('\n'); $('ioText').value=txt; try{ await navigator.clipboard.writeText(txt); toast('Copied the pool.'); }catch(e){ $('ioText').select(); toast('Select and copy the text above.'); } };
-$('ioResetCycle').onclick = ()=>{ newCycle(); save(); render(); toast('New shuffle cycle.'); };
+$('ioResetCycle').onclick = ()=>{ clearHistory(); save(); render(); toast('History cleared.'); };
 $('ioResetPos').onclick = ()=>{ state.pos={}; save(); renderRows(); toast('Forgot saved positions.'); };
 
 // ---------- boot ----------
