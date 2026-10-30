@@ -114,7 +114,7 @@ details.io .rowb{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 <div class="wrap">
 <header>
   <h1>Gapless Shuffle</h1>
-  <p>History of Philosophy without any gaps, shuffled. Tick the episodes you want in the pool; each next episode is an independent uniform draw from the pool, with replacement, so repeats can happen.</p>
+  <p>History of Philosophy without any gaps, shuffled. Tick episodes into the pool; the next one is drawn on a forgetting curve: never-heard first, long-ago next, recent rarely.</p>
 </header>
 <div class="stats" id="stats"></div>
 <div class="tabs" role="tablist" id="tabs"></div>
@@ -134,6 +134,7 @@ details.io .rowb{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 <div id="lists"></div>
 <details class="io">
   <summary>Import / export the pool</summary>
+  <p>Odds: an episode heard k times, t ago, has weight 1 − exp(−t / (k·τ)) where τ is the mean time since last listen across the pool; never-heard episodes have weight 1; nothing goes below 0.5 %. A listen is counted when 80 % of an episode has played or it ends. Listen history is kept even if you remove an episode from the pool.</p>
   <p>Lock-screen, car and headphone skip buttons go back 15 s and forward 30 s (episodes still change on their own when one ends). After an outside interruption such as a call, Siri, or Maps directions with “Pause Spoken Audio” on, playback resumes 2 s before the interruption.</p>
   <p>Export copies the pool as one id per line (e.g. <code>HoP-42</code>, <code>HPI-7</code>, <code>HAP-101</code>, <code>HPC-3</code>). Import accepts the same ids, or a list of episode audio URLs, or the JSON exported from the Apple Podcasts backup script; matched episodes are added to the pool.</p>
   <textarea id="ioText" placeholder="Paste ids, URLs, or JSON here"></textarea>
@@ -141,6 +142,7 @@ details.io .rowb{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
     <button class="btn" id="ioImport">Import into pool</button>
     <button class="btn" id="ioExport">Copy pool</button>
     <button class="btn quiet" id="ioResetCycle">Clear history</button>
+    <button class="btn quiet" id="ioForgetListens">Forget listens</button>
     <button class="btn quiet" id="ioResetPos">Forget positions</button>
   </div>
 </details>
@@ -204,7 +206,7 @@ const state = {
   order: LS.get('order', []),                 // play history (ids), oldest first
   idx: LS.get('idx', -1),                     // index into the history of the current episode
   pos: LS.get('pos', {}),                     // id -> seconds
-  done: new Set(LS.get('done', [])),          // ids that have been played to the end at least once
+  listens: LS.get('listens', {}),             // id -> {n: listen count, last: ms epoch of last listen}; kept even when removed from the pool
   rate: LS.get('rate', 1),
   tab: LS.get('tab', 'HoP'),
   visibleCap: {},
@@ -213,7 +215,7 @@ const state = {
 for (const id of [...state.pool]) if (!byId.has(id)) state.pool.delete(id);
 state.order = state.order.filter(id => byId.has(id));
 if (state.idx >= state.order.length) state.idx = state.order.length - 1;
-const save = () => { LS.set('pool',[...state.pool]); LS.set('order',state.order); LS.set('idx',state.idx); LS.set('pos',state.pos); LS.set('done',[...state.done]); LS.set('rate',state.rate); LS.set('tab',state.tab); };
+const save = () => { LS.set('pool',[...state.pool]); LS.set('order',state.order); LS.set('idx',state.idx); LS.set('pos',state.pos); LS.set('listens',state.listens); LS.set('rate',state.rate); LS.set('tab',state.tab); };
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
@@ -236,15 +238,64 @@ let toastT; function toast(msg){ const t=$('toast'); t.textContent=msg; t.classL
 // so immediate repeats are possible and expected at rate 1/|pool|. The history (state.order)
 // records what was drawn so Previous/Next can walk back and forth through it.
 const HISTORY_MAX = 500;
-function drawFromPool(){ const ids = [...state.pool]; const r = (typeof window.__testRandInt === 'function') ? window.__testRandInt : randInt; return ids[r(ids.length)]; }
+// Uniform float in [0,1) with 53 random bits from the CSPRNG.
+function randFloat(){
+  if (typeof window.__testRandFloat === 'function') return window.__testRandFloat();
+  if ((window.crypto||{}).getRandomValues){ const b = new Uint32Array(2); crypto.getRandomValues(b); return ((b[0] >>> 5) * 67108864 + (b[1] >>> 6)) / 9007199254740992; }
+  return Math.random();
+}
+// ---------- forgetting curve ----------
+// Each pool episode gets a weight from how long ago it was last listened to, measured RELATIVE to
+// the pool's own history: tau = mean time-since-last-listen over the listened episodes in the pool.
+//   never listened:   w = 1
+//   listened k times: w = 1 - exp(-t / (k * tau)),  floored at W_FLOOR
+// So a never-heard episode is always most likely, an episode heard long ago (relative to the rest)
+// approaches that, a recent one is unlikely, and each repeat listen slows the recovery (k).
+const W_FLOOR = 0.005, DAY = 86400000;
+function listenStats(now){
+  const ids = [...state.pool]; let sum = 0, m = 0;
+  for (const id of ids){ const L = state.listens[id]; if (L && L.n > 0){ sum += Math.max(0, now - L.last); m++; } }
+  return { ids, tau: m ? sum / m : 0, listened: m };
+}
+function weightOf(id, now, tau){
+  const L = state.listens[id]; if (!L || !(L.n > 0)) return 1;
+  if (!(tau > 0)) return W_FLOOR;
+  const t = Math.max(0, now - L.last);
+  return Math.max(W_FLOOR, 1 - Math.exp(-t / (L.n * tau)));
+}
+function weights(now){
+  now = now || Date.now(); const { ids, tau, listened } = listenStats(now);
+  const w = {}; let total = 0; for (const id of ids){ w[id] = weightOf(id, now, tau); total += w[id]; }
+  return { w, total, tau, listened };
+}
+window.__weights = weights;
+function drawFromPool(){
+  const { w, total } = weights(); const ids = Object.keys(w);
+  if (!ids.length) return null;
+  if (typeof window.__testPick === 'function') return window.__testPick(ids);
+  let r = randFloat() * total;
+  for (const id of ids){ r -= w[id]; if (r < 0) return id; }
+  return ids[ids.length - 1]; // floating-point tail
+}
 window.__drawFromPool = drawFromPool;
+// A listen is credited once per history entry, when 80% of the episode has played or it ends.
+const CREDIT_AT = 0.8; let creditedIdx = LS.get('credited', -1);
+function creditListen(id){
+  if (creditedIdx === state.idx) return;
+  creditedIdx = state.idx; LS.set('credited', creditedIdx);
+  const L = state.listens[id] || { n: 0, last: 0 }; L.n += 1; L.last = Date.now(); state.listens[id] = L; LS.set('listens', state.listens);
+  renderStats();
+}
+window.__creditListen = creditListen;
 function rebuildOrder(){
   // pool edits never rewrite history; only the future draws change
-  if (state.order.length > HISTORY_MAX){ const cut = state.order.length - HISTORY_MAX; state.order = state.order.slice(cut); state.idx = Math.max(-1, state.idx - cut); }
+  if (state.order.length > HISTORY_MAX){ const cut = state.order.length - HISTORY_MAX; state.order = state.order.slice(cut); state.idx = Math.max(-1, state.idx - cut); if (creditedIdx >= 0){ creditedIdx = Math.max(-1, creditedIdx - cut); LS.set('credited', creditedIdx); } }
 }
 function clearHistory(){
   const cur = state.idx>=0 ? state.order[state.idx] : null;
+  const wasCredited = creditedIdx === state.idx && state.idx >= 0;
   state.order = cur ? [cur] : []; state.idx = cur ? 0 : -1;
+  creditedIdx = wasCredited ? 0 : -1; LS.set('credited', creditedIdx);
 }
 function current(){ return state.idx>=0 && state.idx<state.order.length ? byId.get(state.order[state.idx]) : null; }
 function advance(dir){
@@ -319,13 +370,14 @@ function playId(id){
 }
 audio.addEventListener('timeupdate', () => {
   const e=current(); if (!e || loadedId!==e.id) return;
+  if (audio.duration && isFinite(audio.duration) && audio.currentTime / audio.duration >= CREDIT_AT) creditListen(e.id);
   if (Math.floor(audio.currentTime)%5===0){ state.pos[e.id]=audio.currentTime; LS.set('pos',state.pos); }
   if (!seeking){ $('seek').value = audio.duration ? Math.round(1000*audio.currentTime/audio.duration) : 0; }
   $('tCur').textContent = fmt(audio.currentTime); $('tDur').textContent = fmt(audio.duration||e.dur);
   if ('mediaSession' in navigator && navigator.mediaSession.setPositionState && audio.duration && isFinite(audio.duration)) { try{ navigator.mediaSession.setPositionState({duration:audio.duration, playbackRate:audio.playbackRate, position:Math.min(audio.currentTime,audio.duration)}); }catch(err){} }
 });
 audio.addEventListener('ended', () => {
-  const e=current(); if (e){ state.done.add(e.id); delete state.pos[e.id]; }
+  const e=current(); if (e){ creditListen(e.id); delete state.pos[e.id]; }
   const n = advance(1); save(); load(n, true, true);
 });
 audio.addEventListener('playing', ()=>{ errStreak = 0; });
@@ -368,8 +420,9 @@ function renderNow(){
 }
 function renderStats(){
   let secs=0; for (const id of state.pool) secs += byId.get(id).dur||0;
-  const p = state.pool.size ? (100/state.pool.size) : 0;
-  $('stats').innerHTML = `<span><b>${state.pool.size}</b> in pool</span><span><b>${hours(secs)}</b> of audio</span><span><b>${p ? (p>=10 ? p.toFixed(0) : p.toFixed(1)) : '–'}%</b> each per draw</span><span><b>${state.order.length}</b> draws so far</span>`;
+  const { tau, listened } = listenStats(Date.now());
+  const tauTxt = listened ? (tau >= DAY ? (tau/DAY).toFixed(tau >= 10*DAY ? 0 : 1)+' d' : tau >= 3600000 ? (tau/3600000).toFixed(1)+' h' : Math.round(tau/60000)+' min') : '–';
+  $('stats').innerHTML = `<span><b>${state.pool.size}</b> in pool</span><span><b>${hours(secs)}</b> of audio</span><span><b>${listened}</b> heard · τ <b>${tauTxt}</b></span><span><b>${state.order.length}</b> draws so far</span>`;
 }
 function renderTabs(){
   $('tabs').innerHTML = SERIES.map(s=>{ const all=EP.filter(e=>e.s===s.k).length, sel=EP.filter(e=>e.s===s.k && state.pool.has(e.id)).length;
@@ -386,9 +439,13 @@ function renderRows(){
   const items = visible(); const s = SERIES.find(x=>x.k===state.tab);
   const cap = state.visibleCap[state.tab] || PAGE;
   const cur = current();
+  const now = Date.now(), W = weights(now);
+  const ago = ms => { const d = ms/DAY; return d >= 1 ? Math.round(d)+' d ago' : ms >= 3600000 ? Math.round(ms/3600000)+' h ago' : 'just now'; };
   const rows = items.slice(0,cap).map(e=>{
-    const done = state.done.has(e.id), p = state.pos[e.id];
-    const meta = [e.d, fmt(e.dur)].concat(done?['<span class="done">finished before</span>']:[], (p&&p>30)?['at '+fmt(p)]:[]).join(' · ');
+    const L = state.listens[e.id], p = state.pos[e.id];
+    const heard = L && L.n > 0 ? [`<span class="done">heard ${L.n}× · ${ago(now - L.last)}</span>`] : [];
+    const prob = state.pool.has(e.id) && W.total > 0 ? [`next ${(100*W.w[e.id]/W.total).toFixed(100*W.w[e.id]/W.total >= 10 ? 0 : 1)}%`] : [];
+    const meta = [e.d, fmt(e.dur)].concat(heard, prob, (p&&p>30)?['at '+fmt(p)]:[]).join(' · ');
     return `<li class="row${cur&&cur.id===e.id?' playing':''}" data-id="${e.id}">
       <input type="checkbox" id="cb-${e.id}" ${state.pool.has(e.id)?'checked':''} aria-label="Include ${label(e)} ${e.t}">
       <label class="t" for="cb-${e.id}">${e.n?`<span class="num">${e.n}${e.sfx||''}</span>`:''}${e.t}<span class="meta">${meta}</span></label>
@@ -434,6 +491,7 @@ $('ioImport').onclick = ()=>{ const {found,unmatched}=parseImport($('ioText').va
 $('ioExport').onclick = async ()=>{ const txt=[...state.pool].join('\n'); $('ioText').value=txt; try{ await navigator.clipboard.writeText(txt); toast('Copied the pool.'); }catch(e){ $('ioText').select(); toast('Select and copy the text above.'); } };
 $('ioResetCycle').onclick = ()=>{ clearHistory(); save(); render(); toast('History cleared.'); };
 $('ioResetPos').onclick = ()=>{ state.pos={}; save(); renderRows(); toast('Forgot saved positions.'); };
+$('ioForgetListens').onclick = ()=>{ state.listens={}; creditedIdx=-1; LS.set('credited',-1); save(); render(); toast('Listen history forgotten; everything counts as never heard.'); };
 
 // ---------- boot ----------
 render();
