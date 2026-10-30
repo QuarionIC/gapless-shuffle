@@ -14,7 +14,7 @@ FEEDS = ["https://feed.podbean.com/hopwag/feed.xml", "https://feed.podbean.com/h
 PFX = "https://mcdn.podbean.com/mf/web/"
 ITUNES = "{http://www.itunes.com/dtds/podcast-1.0.dtd}"
 ORDER = {"HoP": 0, "HPI": 1, "HAP": 2, "HPC": 3, "Extra": 4}
-TITLE_RE = re.compile(r"^(HoP|HAP|HPI|HPC)\s*(\d+)([ab])?[\s.\-–:]*(.*)$", re.S)
+TITLE_RE = re.compile(r"^(HoP|HAP|HPI|HPC)\s*(\d+)([a-z])?[\s.\-–:]*(.*)$", re.S)
 
 
 def parse_title(t):
