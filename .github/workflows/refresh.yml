@@ -1,0 +1,35 @@
+name: Refresh episodes
+
+on:
+  schedule:
+    - cron: "23 6 * * 1,4"   # Mondays and Thursdays, 06:23 UTC (new episodes usually land on Sundays)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-episodes
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Regenerate episodes.json from the feeds
+        run: python scripts/refresh_episodes.py episodes.json
+      - name: Commit and push if changed
+        run: |
+          if git diff --quiet -- episodes.json; then
+            echo "episodes.json unchanged; nothing to commit"
+            exit 0
+          fi
+          git config user.name "gapless-refresh"
+          git config user.email "gapless-refresh@users.noreply.github.com"
+          git add episodes.json
+          git commit -m "Refresh episodes ($(date -u +%Y-%m-%d))"
+          git push
